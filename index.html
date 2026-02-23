@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Five Nights at Web</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Vt323&display=swap');
+
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: 'Vt323', monospace;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* --- MAIN MENU SCREEN --- */
+        #menu-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: #000; z-index: 2000; /* Paling Atas */
+            display: flex; flex-direction: column; padding-left: 100px; justify-content: center;
+        }
+
+        /* Judul Game */
+        .game-title {
+            font-size: 6rem; letter-spacing: 5px; margin-bottom: 20px;
+            text-shadow: 2px 2px 0px #333;
+            border-left: 10px solid #a55; padding-left: 20px;
+        }
+
+        /* Menu Options */
+        .menu-opt {
+            font-size: 2.5rem; color: #aaa; cursor: pointer; margin: 10px 0;
+            transition: 0.2s; width: fit-content;
+        }
+        .menu-opt:hover { color: white; transform: translateX(10px); text-shadow: 0 0 10px white; }
+        .menu-opt span { opacity: 0; margin-right: 10px; }
+        .menu-opt:hover span { opacity: 1; }
+
+        /* Efek Static TV di Menu */
+        .scanlines {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+            background-size: 100% 4px; pointer-events: none; z-index: 2001;
+        }
+
+        /* --- LOADING SCREEN (12 AM) --- */
+        #loading-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 1500; display: none;
+            align-items: center; justify-content: center; flex-direction: column;
+        }
+
+        /* --- GAME SCREEN --- */
+        #game-screen {
+            width: 100vw; height: 100vh; background: #111; position: relative;
+            box-shadow: inset 0 0 150px #000; display: none; /* Awalnya hidden */
+        }
+
+        /* --- OFFICE & DOORS --- */
+        .hallway-void {
+            position: absolute; top: 20%; bottom: 0; width: 15%;
+            background: #000; z-index: 1; transition: background 0.1s;
+        }
+        #hall-left { left: 0; } #hall-right { right: 0; }
+        .hallway-void.lit { background: #333; box-shadow: inset 0 0 50px #554d00; }
+
+        .door-metal {
+            position: absolute; top: 20%; width: 15%; height: 0%;
+            background: repeating-linear-gradient(45deg, #2c2c2c, #2c2c2c 10px, #1a1a1a 10px, #1a1a1a 20px);
+            transition: height 0.1s linear; z-index: 3; border-bottom: 5px solid #111;
+        }
+        #metal-left { left: 0; border-right: 5px solid #111; }
+        #metal-right { right: 0; border-left: 5px solid #111; }
+        .door-metal.closed { height: 80%; }
+
+        .control-panel {
+            position: absolute; top: 45%; width: 70px; padding: 10px;
+            background: #222; border: 2px solid #444;
+            display: flex; flex-direction: column; gap: 15px; z-index: 100; border-radius: 5px;
+        }
+        .btn-door {
+            width: 60px; height: 60px; border-radius: 50%; border: none;
+            background: #500; color: white; font-family: 'Vt323'; font-size: 1.2rem;
+            cursor: pointer; box-shadow: 0 5px 0 #300;
+        }
+        .btn-door.active { background: #f00; box-shadow: 0 2px 0 #300; transform: translateY(3px); text-shadow: 0 0 5px white; }
+        .btn-light {
+            width: 60px; height: 60px; border-radius: 5px; border: none;
+            background: #ccc; color: black; font-family: 'Vt323'; font-size: 1.2rem;
+            cursor: pointer; box-shadow: 0 5px 0 #666;
+        }
+        .btn-light:active, .btn-light.lit {
+            background: #fff; box-shadow: 0 2px 0 #666; transform: translateY(3px); filter: drop-shadow(0 0 10px yellow);
+        }
+
+        /* --- FREDDY --- */
+        #freddy {
+            position: absolute; width: 180px; height: 300px;
+            background: #533; border-radius: 20px 20px 0 0;
+            z-index: 2; opacity: 0; transition: opacity 0.1s; pointer-events: none;
+        }
+        #freddy::before, #freddy::after {
+            content: ''; position: absolute; top: 80px; width: 30px; height: 30px;
+            background: white; border-radius: 50%; box-shadow: 0 0 15px white;
+        }
+        #freddy::before { left: 40px; } #freddy::after { right: 40px; }
+        .freddy-left { left: 5%; top: 35%; transform: rotate(5deg); }
+        .freddy-right { right: 5%; top: 35%; transform: rotate(-5deg); }
+
+        /* --- HUD --- */
+        .hud { position: absolute; padding: 20px; font-size: 2rem; z-index: 90; pointer-events: none; }
+        .bottom-left { bottom: 0; left: 0; }
+        .top-right { top: 0; right: 0; text-align: right; }
+        .usage-bar { display: inline-block; width: 20px; height: 30px; background: #0f0; margin-left: 2px; transition: 0.2s;}
+        .usage-bar.yellow { background: yellow; } .usage-bar.red { background: red; } .usage-bar.off { background: #333; }
+
+        /* --- MONITOR --- */
+        #monitor-trigger {
+            position: absolute; bottom: 0; left: 20%; width: 60%; height: 50px;
+            background: rgba(255, 255, 255, 0.1); border: 2px solid #555; border-bottom: none;
+            border-radius: 20px 20px 0 0; z-index: 1000; cursor: pointer;
+            text-align: center; line-height: 50px; font-size: 1.5rem; color: #aaa;
+            transition: background 0.2s;
+        }
+        #monitor-trigger:hover { background: rgba(255, 255, 255, 0.3); color: white; }
+
+        #cctv-screen {
+            position: fixed; top: 100%; left: 0; width: 100vw; height: 100vh;
+            background: #050505; z-index: 900; 
+            transition: top 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 10px solid #333; box-sizing: border-box; display: flex;
+        }
+        #cctv-screen.active { top: 0; }
+
+        /* --- MONITOR / CCTV VISUALS --- */
+        #cam-feed {
+            flex: 3;
+            position: relative;
+            border-right: 5px solid #333;
+            overflow: hidden;
+            background-color: #000;
+            /* Efek CRT Scanline */
+            background-image: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+        }
+
+        /* Layer Gambar Ruangan */
+        #cam-view {
+            width: 100%; height: 100%;
+            background-size: cover;
+            background-position: center;
+            filter: sepia(0.5) contrast(1.2) brightness(0.6); /* Efek kamera tua */
+            transition: filter 0.2s;
+        }
+
+        /* --- VISUAL RUANGAN (Ganti URL di sini kalau mau pakai gambar asli) --- */
+
+        /* CAM 1A: STAGE (Tirai Garis-garis) */
+        .view-1a {
+            background: repeating-linear-gradient(90deg, #300, #300 20px, #100 20px, #100 40px);
+            box-shadow: inset 0 -100px 100px #000;
+        }
+
+        /* CAM 1B: DINING (Lantai Catur) */
+        .view-1b {
+            background: 
+                linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222),
+                linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222);
+            background-color: #444;
+            background-size: 40px 40px;
+            background-position: 0 0, 20px 20px;
+            transform: perspective(500px) rotateX(20deg) scale(1.5); /* Efek 3D */
+        }
+
+        /* CAM 1C: PIRATE COVE (Tirai Ungu Gelap) */
+        .view-1c {
+            background: radial-gradient(circle at 50% 80%, #303, #101 60%, #000 90%);
+        }
+
+        /* CAM 2A & 1C: HALLWAYS (Lorong Perspektif) */
+        .view-2a, .view-1c {
+            background: conic-gradient(from 225deg at 50% 50%, #111 0deg, #333 45deg, #000 90deg, #333 135deg, #111 180deg);
+        }
+
+        /* CAM 2B & 4B: CORNERS (Pojokan Gelap) */
+        .view-2b, .view-4b {
+            background: radial-gradient(circle at 80% 20%, #222, #000 70%);
+        }
+
+        /* --- FREDDY VISUAL (DI DALAM KAMERA) --- */
+        /* Ini overlay kalau Freddy ada di ruangan */
+        #freddy-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('assets/freddos.png'); /* Gambar Silhouette Freddy (Transparan) */
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center bottom;
+            opacity: 0; /* Default sembunyi */
+            transition: opacity 0.2s;
+            pointer-events: none;
+            filter: drop-shadow(0 0 10px black);
+        }
+        /* Kalau aktif */
+        #freddy-overlay.visible { opacity: 0.8; }
+
+        /* Posisi Freddy beda-beda tiap kamera */
+        .freddy-pos-1a { background-position: center bottom !important; transform: scale(0.8); } /* Jauh di panggung */
+        .freddy-pos-1b { background-position: left bottom !important; transform: scale(1.2); } /* Dekat di dining */
+        .freddy-pos-hall { background-position: center center !important; transform: scale(0.5); } /* Jauh di lorong */
+        .freddy-pos-close { background-position: center bottom !important; transform: scale(1.5); filter: contrast(200%) !important; } /* DEKAT BANGET */
+        .static-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://media.giphy.com/media/oEI9uBYSzLpBK/giphy.gif');
+            opacity: 0.15; pointer-events: none; z-index: 4;
+        }
+        #cam-label {
+            position: absolute; top: 20px; left: 20px; font-size: 2rem; color: white; text-shadow: 0 0 5px white; z-index: 5;
+        }
+
+        #map-ui { flex: 1; background: #000; position: relative; padding: 20px; }
+        .cam-btn {
+            position: absolute; width: 70px; height: 40px; background: #222; color: #fff; 
+            border: 2px solid #444; cursor: pointer; font-family: 'Vt323'; font-size: 1.1rem;
+        }
+        .cam-btn:hover { background: #444; }
+        .cam-btn.active { background: #0f0; color: black; box-shadow: 0 0 10px #0f0; border-color: #0f0; }
+        
+        /* Map Positions */
+        #btn-1a { top: 5%; left: 35%; } #btn-1b { top: 20%; left: 35%; }
+        #btn-2a { top: 40%; left: 10%; } #btn-2b { top: 60%; left: 10%; }
+        #btn-1c { top: 40%; left: 60%; } #btn-4b { top: 60%; left: 60%; }
+
+        /* Anim Icons */
+        .animatronic-icon {
+            font-size: 8rem; color: #a55; text-shadow: 0 0 20px red;
+            animation: glitch 2s infinite; display: none;
+        }
+        .animatronic-icon.visible { display: block; }
+
+        /* --- SCREENS --- */
+        .overlay-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; display: none; align-items: center; justify-content: center; z-index: 9999;
+        }
+        
+        @keyframes glitch {
+            0% { transform: translate(0); } 20% { transform: translate(-2px, 2px); opacity: 0.8; }
+            40% { transform: translate(2px, -2px); opacity: 1; } 60% { transform: translate(0); opacity: 0.5; }
+            80% { transform: translate(1px, 1px); opacity: 0.9; } 100% { transform: translate(0); }
+        }
+        @keyframes shake {
+            0% { transform: translate(5px, 5px) scale(1.1); } 50% { transform: translate(-5px, -5px) scale(1.2); } 100% { transform: translate(5px, -5px) scale(1.1); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <div class="scanlines"></div>
+        <div class="static-overlay" style="opacity: 0.05;"></div>
+        
+        <h1 class="game-title">FIVE NIGHTS<br>AT WEB</h1>
+        
+        <div class="menu-opt" onclick="initGame()">
+            <span>>></span> NEW GAME
+        </div>
+        <div class="menu-opt">
+            <span>>></span> CONTINUE
+        </div>
+        
+        <div style="position: absolute; bottom: 20px; color: #555;">v.1.0.2 - Freddy Pathing AI</div>
+    </div>
+
+    <div id="loading-screen">
+        <h1 style="font-size: 5rem;">12:00 AM</h1>
+        <p>1st Night</p>
+    </div>
+
+    <div id="game-screen">
+        <div class="hallway-void" id="hall-left"></div>
+        <div class="door-metal" id="metal-left"></div>
+        <div class="control-panel" style="left: 16%;">
+            <button class="btn-door" id="btn-door-left" onclick="toggleDoor('left')">DOOR</button>
+            <button class="btn-light" id="btn-light-left" onmousedown="toggleLight('left', true)" onmouseup="toggleLight('left', false)" ontouchstart="toggleLight('left', true)" ontouchend="toggleLight('left', false)">LIGHT</button>
+        </div>
+
+        <div class="hallway-void" id="hall-right"></div>
+        <div class="door-metal" id="metal-right"></div>
+        <div class="control-panel" style="right: 16%;">
+            <button class="btn-door" id="btn-door-right" onclick="toggleDoor('right')">DOOR</button>
+            <button class="btn-light" id="btn-light-right" onmousedown="toggleLight('right', true)" onmouseup="toggleLight('right', false)" ontouchstart="toggleLight('right', true)" ontouchend="toggleLight('right', false)">LIGHT</button>
+        </div>
+
+        <div id="freddy"></div>
+
+        <div class="hud bottom-left">
+            <div>Power: <span id="power-disp">100</span>%</div>
+            <div style="font-size: 1rem; margin-top: 5px;">
+                Usage: <span class="usage-bar" id="bar1"></span><span class="usage-bar off" id="bar2"></span><span class="usage-bar off" id="bar3"></span><span class="usage-bar off" id="bar4"></span><span class="usage-bar off" id="bar5"></span>
+            </div>
+        </div>
+        <div class="hud top-right">
+            <div id="time-disp">12 AM</div>
+            <div style="font-size: 1rem;">Night 1</div>
+        </div>
+
+        <div id="monitor-trigger" onclick="toggleMonitor()"><span id="trigger-text">OPEN MONITOR</span></div>
+        <div id="cctv-screen">
+            <div id="cam-feed">
+                <div class="static-overlay"></div>
+                
+                <div id="cam-label">CAM 1A: SHOW STAGE</div>
+
+                <div id="cam-view" class="view-1a">
+                    <div id="freddy-overlay"></div>
+                </div>
+            </div>
+            <div id="map-ui">
+                <div style="color:white; text-align:center; margin-bottom:20px;">CAMERA SYSTEM</div>
+                <button class="cam-btn active" id="btn-1a" onclick="switchCam('1a', 'SHOW STAGE')">CAM 1A</button>
+                <button class="cam-btn" id="btn-1b" onclick="switchCam('1b', 'DINING AREA')">CAM 1B</button>
+                <button class="cam-btn" id="btn-2a" onclick="switchCam('2a', 'WEST HALL')">CAM 2A</button>
+                <button class="cam-btn" id="btn-2b" onclick="switchCam('2b', 'W. CORNER')">CAM 2B</button>
+                <button class="cam-btn" id="btn-1c" onclick="switchCam('1c', 'EAST HALL')">CAM 1C</button>
+                <button class="cam-btn" id="btn-4b" onclick="switchCam('4b', 'E. CORNER')">CAM 4B</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="jumpscare-screen" class="overlay-screen">
+        <h1 style="font-size: 5rem; color: red; animation: shake 0.1s infinite;">JUMPSCARE!!</h1>
+        <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px; background:white; border:none; cursor:pointer; font-family:inherit;">TRY AGAIN</button>
+    </div>
+    <div id="win-screen" class="overlay-screen" style="background: white; color: black;">
+        <h1 style="font-size: 8rem;">6 AM</h1>
+        <button onclick="location.reload()" style="margin-top:20px; padding:10px 20px; background:black; color:white; border:none; cursor:pointer; font-family:inherit;">MAIN MENU</button>
+    </div>
+
+    <script>
+        // --- GAME VARIABLES ---
+        let gameActive = false;
+        let gameLoop; // Variable untuk menyimpan interval loop
+
+        // Stats
+        let power = 100;
+        let time = 0;
+        let doors = { left: false, right: false };
+        let lights = { left: false, right: false };
+        let monitorOpen = false;
+        let currentCam = '1a';
+
+        // AI
+        let freddyLoc = '1a';
+        let aiLevel = 8;
+        let aiCooldown = 0;
+        let attackTimer = 0;
+
+        // --- MENU LOGIC ---
+        function initGame() {
+            // 1. Hide Menu
+            document.getElementById('menu-screen').style.display = 'none';
+            
+            // 2. Show Loading Screen (Transition)
+            const loading = document.getElementById('loading-screen');
+            loading.style.display = 'flex';
+
+            // 3. Start Game after 2 seconds
+            setTimeout(() => {
+                loading.style.display = 'none';
+                document.getElementById('game-screen').style.display = 'block';
+                startGameLogic();
+            }, 2000);
+        }
+
+        function startGameLogic() {
+            gameActive = true;
+            // Reset Vars just in case
+            power = 100;
+            time = 0;
+            freddyLoc = '1a';
+            
+            // START THE LOOP
+            gameLoop = setInterval(updateGame, 1000);
+        }
+
+        // --- MAIN LOOP ---
+        function updateGame() {
+            if (!gameActive) return;
+
+            // 1. Power
+            let drain = 0.1;
+            if (doors.left) drain += 0.2; if (doors.right) drain += 0.2;
+            if (lights.left) drain += 0.3; if (lights.right) drain += 0.3;
+            if (monitorOpen) drain += 0.4;
+            
+            power -= drain;
+            if (power <= 0) blackout();
+            document.getElementById('power-disp').innerText = Math.floor(power);
+            updateUsageBar(drain);
+
+            // 2. Time
+            time++;
+            let hour = 12 + Math.floor(time / 20);
+            if (hour > 12) hour -= 12;
+            document.getElementById('time-disp').innerText = hour + " AM";
+            if (hour === 6 && time >= 120) winGame();
+
+            // 3. AI
+            processAI();
+        }
+
+        // --- AI LOGIC (Pathing) ---
+        function processAI() {
+            // A. ATTACK MODE (Blind Spot)
+            if (freddyLoc === 'door_left' || freddyLoc === 'door_right') {
+                attackTimer--;
+                console.log(`Freddy attacking... ${attackTimer}s`);
+                if (attackTimer <= 0) {
+                    let side = (freddyLoc === 'door_left') ? 'left' : 'right';
+                    if (doors[side]) {
+                        console.log("BLOCKED! Freddy moving back.");
+                        freddyLoc = (side === 'left') ? '2a' : '1c';
+                        aiCooldown = 10;
+                    } else {
+                        jumpscare();
+                    }
+                }
+                checkDoorVisuals();
+                return;
+            }
+
+            // B. COOLDOWN
+            if (aiCooldown > 0) {
+                aiCooldown--;
+                return;
+            }
+
+            // C. MOVEMENT ROLL
+            if (Math.random() * 20 < aiLevel) {
+                moveFreddy();
+                aiCooldown = 3 + Math.floor(Math.random() * 5);
+                if (monitorOpen) updateCamVisuals();
+            }
+        }
+
+        function moveFreddy() {
+            switch(freddyLoc) {
+                case '1a': freddyLoc = '1b'; break;
+                case '1b': freddyLoc = Math.random() > 0.5 ? '2a' : '1c'; break;
+                // West Path
+                case '2a': freddyLoc = Math.random() > 0.3 ? '2b' : '1b'; break;
+                case '2b': 
+                    if (Math.random() > 0.5) {
+                        freddyLoc = 'door_left';
+                        attackTimer = 10 + Math.floor(Math.random() * 4);
+                    } else freddyLoc = '2a';
+                    break;
+                // East Path
+                case '1c': freddyLoc = Math.random() > 0.3 ? '4b' : '1b'; break;
+                case '4b':
+                    if (Math.random() > 0.5) {
+                        freddyLoc = 'door_right';
+                        attackTimer = 10 + Math.floor(Math.random() * 4);
+                    } else freddyLoc = '1c';
+                    break;
+            }
+        }
+
+        // --- VISUAL UPDATES ---
+        function updateCamVisuals() {
+            let roomNames = {
+                '1a': 'SHOW STAGE', '1b': 'DINING AREA',
+                '2a': 'WEST HALL', '2b': 'W. HALL CORNER',
+                '1c': 'EAST HALL', '4b': 'E. HALL CORNER'
+            };
+            
+            // 1. Update Teks
+            document.getElementById('cam-label').innerText = `CAM ${currentCam.toUpperCase()}: ${roomNames[currentCam]}`;
+
+            // 2. Update Background Ruangan
+            const view = document.getElementById('cam-view');
+            // Hapus semua class 'view-...' yang lama
+            view.className = ''; 
+            // Tambah class baru (misal: view-1a)
+            view.classList.add(`view-${currentCam}`);
+
+            // 3. Update Freddy
+            const freddyOverlay = document.getElementById('freddy-overlay');
+            // Reset posisi freddy
+            freddyOverlay.className = '';
+
+            if (currentCam === freddyLoc) {
+                freddyOverlay.classList.add('visible');
+                
+                // Atur posisi/gaya freddy berdasarkan ruangan
+                if (currentCam === '1a') freddyOverlay.classList.add('freddy-pos-1a');
+                else if (currentCam === '1b') freddyOverlay.classList.add('freddy-pos-1b');
+                else if (currentCam === '2a' || currentCam === '1c') freddyOverlay.classList.add('freddy-pos-hall');
+                else if (currentCam === '2b' || currentCam === '4b') freddyOverlay.classList.add('freddy-pos-close'); // Serem!
+            } else {
+                freddyOverlay.classList.remove('visible');
+            }
+
+            // 4. Efek Static (Visual Glitch)
+            const staticFX = document.querySelector('#cctv-screen .static-overlay');
+            staticFX.style.opacity = '0.6'; // Static tebal pas ganti kamera
+            setTimeout(() => staticFX.style.opacity = '0.15', 150);
+        }
+
+        function checkDoorVisuals() {
+            const freddyEl = document.getElementById('freddy');
+            freddyEl.className = ''; freddyEl.style.opacity = '0';
+            if (freddyLoc === 'door_left') {
+                freddyEl.classList.add('freddy-left');
+                if (lights.left) freddyEl.style.opacity = '1';
+            } else if (freddyLoc === 'door_right') {
+                freddyEl.classList.add('freddy-right');
+                if (lights.right) freddyEl.style.opacity = '1';
+            }
+        }
+
+        // --- CONTROLS ---
+        function toggleDoor(side) {
+            if (!gameActive || power <= 0) return;
+            doors[side] = !doors[side];
+            const metal = document.getElementById(`metal-${side}`);
+            const btn = document.getElementById(`btn-door-${side}`);
+            if (doors[side]) { metal.classList.add('closed'); btn.classList.add('active'); } 
+            else { metal.classList.remove('closed'); btn.classList.remove('active'); }
+        }
+
+        function toggleLight(side, isOn) {
+            if (!gameActive || power <= 0) return;
+            lights[side] = isOn;
+            const hall = document.getElementById(`hall-${side}`);
+            if (isOn) hall.classList.add('lit'); else hall.classList.remove('lit');
+            checkDoorVisuals();
+        }
+
+        function toggleMonitor() {
+            if (!gameActive || power <= 0) return;
+            monitorOpen = !monitorOpen;
+            const screen = document.getElementById('cctv-screen');
+            const trigger = document.getElementById('trigger-text');
+            if (monitorOpen) {
+                screen.classList.add('active'); trigger.innerText = "CLOSE MONITOR";
+                updateCamVisuals();
+            } else {
+                screen.classList.remove('active'); trigger.innerText = "OPEN MONITOR";
+            }
+            updateUsageBar(0.1); 
+        }
+
+        function switchCam(camID, camName) {
+            if (!gameActive || power <= 0) return;
+            currentCam = camID;
+            document.querySelectorAll('.cam-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${camID}`).classList.add('active');
+            document.getElementById('cam-label').innerText = `CAM ${camID.toUpperCase()}: ${camName}`;
+            updateCamVisuals();
+        }
+
+        function updateUsageBar(drain) {
+            let usageLevel = 1;
+            if (doors.left) usageLevel++; if (doors.right) usageLevel++;
+            if (lights.left) usageLevel++; if (lights.right) usageLevel++;
+            if (monitorOpen) usageLevel++;
+
+            for (let i = 1; i <= 5; i++) {
+                let bar = document.getElementById(`bar${i}`);
+                if (i <= usageLevel) {
+                    bar.classList.remove('off');
+                    if (usageLevel >= 4) { bar.classList.add('red'); bar.classList.remove('yellow'); }
+                    else if (usageLevel >= 3) { bar.classList.add('yellow'); bar.classList.remove('red'); }
+                    else { bar.classList.remove('yellow', 'red'); }
+                } else { bar.classList.add('off'); }
+            }
+        }
+
+        // --- GAME OVER ---
+        function jumpscare() {
+            gameActive = false; clearInterval(gameLoop);
+            document.getElementById('jumpscare-screen').style.display = 'flex';
+        }
+        function blackout() {
+            gameActive = false;
+            lights.left = false; lights.right = false;
+            document.getElementById('hall-left').classList.remove('lit');
+            document.getElementById('hall-right').classList.remove('lit');
+            document.getElementById('metal-left').classList.remove('closed');
+            document.getElementById('metal-right').classList.remove('closed');
+            alert("NO POWER..."); setTimeout(jumpscare, 3000);
+        }
+        function winGame() {
+            gameActive = false; clearInterval(gameLoop);
+            document.getElementById('win-screen').style.display = 'flex';
+        }
+    </script>
+</body>
+</html>
